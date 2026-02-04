@@ -205,3 +205,8 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# qwen-code-cli 配置
+.qwen/
+# GitHub App 凭据
+gha-creds-*.json
