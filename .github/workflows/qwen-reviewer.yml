@@ -1,0 +1,25 @@
+name: ⚖️ Qwen Reviewer
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Review Agent
+        uses: qwenlm/qwen-code-action@v1
+        with:
+          qwen-token: ${{ secrets.QWEN_TOKEN }}
+          task: "review"
+          prompt: |
+            你是以严苛著称的代码审查员。
+
+            请检查该 PR：
+            1. **安全性**：是否存在注入风险、密钥泄露？
+            2. **一致性**：实现是否符合 `specs/` 目录下的定义？
+            3. **完备性**：是否有测试代码？
+
+            如果发现严重问题，请 Request Changes。
+            如果是 `[CHAOS]` 前缀的 PR，请格外注意是否改变了原有业务逻辑（Chaos Monkey 不应改变业务逻辑，只能重构）。
