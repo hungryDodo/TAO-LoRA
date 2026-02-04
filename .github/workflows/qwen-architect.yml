@@ -1,0 +1,23 @@
+name: 🧠 Qwen Architect
+on:
+  schedule:
+    - cron: '0 */4 * * *' # 每4小时运行一次
+  workflow_dispatch: # 支持手动触发
+
+jobs:
+  planning:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Architect Agent
+        uses: qwenlm/qwen-code-action@v1
+        with:
+          qwen-token: ${{ secrets.QWEN_TOKEN }}
+          model: 'qwen-2.5-coder-32b-instruct'
+          task: "planning"
+          prompt: |
+            你是项目的首席架构师。请执行以下 Spec-kit 管理流程：
+            1. 读取 `spec-kit/plan.md`，识别未标记为 'Completed' 的 Milestone。
+            2. 检查 `specs/` 目录，看是否有对应的 Spec 文件。如果没有，请创建一个 `specs/xxx.md` 草稿。
+            3. 如果发现有 `Status: Draft` 的 Spec，请根据你的技术知识补充详细的接口定义、数据结构和测试计划，并将状态改为 `Review_Needed`。
+            4. 扫描 Issue 列表，如果发现有 Spec 已经准备好但没有 Issue，请创建一个新 Issue，打上标签 `qwen-build`。
