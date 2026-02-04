@@ -9,14 +9,50 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+          pip install numpy scipy triton pytest
+
       - name: Identify Weak Targets
         id: target
         run: |
-          # 这里可以使用简单的脚本或工具分析代码库
-          # 策略1：随机抽取一个修改时间超过 7 天的文件
-          # 策略2：查找代码行数超过 200 行且没有对应 .test.ts 的文件
-          # 策略3：利用 grep 查找 "TODO" 或 "FIXME"
-          echo "target_file=src/legacy_module.py" >> $GITHUB_OUTPUT
+          # 分析代码库，寻找需要优化的目标
+          # 策略1：查找修改时间超过7天的Python文件
+          # 策略2：查找代码行数超过200行且没有对应测试的文件
+          # 策略3：利用grep查找"TODO"或"FIXME"
+          # 策略4：特别关注TAO-LoRA核心模块的性能和稳定性
+
+          # 查找最近修改时间超过7天的Python文件
+          TARGET_FILE=$(find src/ -name "*.py" -mtime +7 -not -path "*/test*" -not -path "*/tests/*" | head -1)
+
+          if [ -z "$TARGET_FILE" ]; then
+            # 如果没有找到超过7天的文件，则查找可能缺少测试的文件
+            for file in $(find src/ -name "*.py" -not -path "*/test*" -not -path "*/tests/*"); do
+              test_file=$(echo "$file" | sed 's|src/|tests/|' | sed 's|\.py$|_test\.py|')
+              if [ ! -f "$test_file" ]; then
+                TARGET_FILE="$file"
+                break
+              fi
+            done
+          fi
+
+          if [ -z "$TARGET_FILE" ]; then
+            # 查找包含TODO或FIXME的文件
+            TARGET_FILE=$(grep -r "TODO\|FIXME" src/ --include="*.py" | head -1 | cut -d: -f1)
+          fi
+
+          if [ -z "$TARGET_FILE" ]; then
+            # 默认选择一个TAO-LoRA核心模块
+            TARGET_FILE="src/model/talora_model.py"
+          fi
+
+          echo "target_file=$TARGET_FILE" >> $GITHUB_OUTPUT
 
       - name: Chaos Agent
         uses: qwenlm/qwen-code-action@v1
@@ -25,17 +61,19 @@ jobs:
           model: 'qwen-2.5-coder-32b-instruct'
           task: "refactor"
           prompt: |
-            你是 "Chaos Monkey" 代码进化者。你的目标是主动提升代码库的鲁棒性。
+            你是 "Chaos Monkey" 代码进化者。你的目标是主动提升TAO-LoRA代码库的鲁棒性。
 
             目标文件：${{ steps.target.outputs.target_file }}
 
             请执行以下任一操作（根据文件情况决定）：
             1. **补充测试**：如果该文件没有测试，请为它编写全面的单元测试。
-            2. **类型强化**：如果代码中有 `any` (TS) 或缺少类型注解 (Python)，请补全强类型。
-            3. **性能优化**：如果发现低效的循环或逻辑，进行重构。
-            4. **文档补全**：如果缺少 DocString，请补全。
+            2. **性能优化**：如果发现低效的量化、路由或LoRA计算，进行重构以提高效率。
+            3. **健壮性增强**：改进错误处理，增加边界条件检查，特别是针对传感器数据异常值的处理。
+            4. **文档补全**：如果缺少DocString，请补全，特别是关于时间感知量化和动态路径选择的说明。
 
             规则：
-            - 先创建一个 Spec：`specs/optimization/opt-${{ steps.target.outputs.target_file }}.md` 描述你要做的事情。
-            - 代码必须通过现有的 CI 检查。
-            - 提交 PR，标题前缀必须是 `[CHAOS]`，并打上 `auto-optimization` 标签。
+            - 遵循 `.specify/memory/constitution.md` 中的项目原则
+            - 先创建一个优化计划：`specs/optimization/opt-$(basename ${{ steps.target.outputs.target_file }} | sed 's/\.[^.]*$//').md` 描述你要做的事情。
+            - 代码必须通过现有的CI检查和性能基准测试。
+            - 提交PR，标题前缀必须是 `[CHAOS]`，并打上 `auto-optimization` 标签。
+            - 确保优化不会影响关键的事件保留功能。

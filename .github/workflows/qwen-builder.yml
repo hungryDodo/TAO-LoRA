@@ -12,11 +12,36 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+          pip install numpy scipy triton pytest
+
       - name: Find Task
         id: find_task
         run: |
-          # 简单的脚本去查找带有 'qwen-build' 标签且未分配的 Issue
+          # 查找带有 'qwen-build' 标签且未分配的 Issue
           # 输出 Issue Number 和相关 Spec 文件路径
+          ISSUE_NUMBER=$(gh issue list --label "qwen-build" --state open --json number --jq '.[0].number' 2>/dev/null || echo "")
+          if [ ! -z "$ISSUE_NUMBER" ] && [ "$ISSUE_NUMBER" != "null" ]; then
+            echo "issue_number=$ISSUE_NUMBER" >> $GITHUB_OUTPUT
+
+            # 尝试找到相关的 spec 文件
+            SPEC_PATH=$(find specs/ -name "*.md" -exec grep -l "#$ISSUE_NUMBER" {} \; | head -1)
+            if [ -z "$SPEC_PATH" ]; then
+              SPEC_PATH=$(find specs/ -name "spec.md" | head -1)
+            fi
+            if [ ! -z "$SPEC_PATH" ]; then
+              echo "spec_path=$SPEC_PATH" >> $GITHUB_OUTPUT
+            fi
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Builder Agent
         if: steps.find_task.outputs.issue_number != ''
@@ -30,8 +55,15 @@ jobs:
             目标：解决 Issue #${{ steps.find_task.outputs.issue_number }}
             依据：请严格遵循 Spec 文档 ${{ steps.find_task.outputs.spec_path }}
 
+            遵循 TAO-LoRA 项目规范：
+            - 符合 `.specify/memory/constitution.md` 中的项目原则
+            - 实现时间感知量化、动态路径路由、硬件优化和事件保留机制
+            - 遵循已有的项目结构和代码风格
+
             执行步骤：
-            1. 编写/修改代码。
-            2. **必须**编写对应的单元测试。
-            3. 运行测试，如果失败，利用剩余额度自动修复代码（Self-Healing）。
-            4. 提交 PR，分支名为 `feat/issue-${{ steps.find_task.outputs.issue_number }}`。
+            1. 检查 `specs/${{ steps.find_task.outputs.issue_number }}-*` 目录下的 spec、plan 和 tasks 文件，了解具体要求。
+            2. 根据 `tasks.md` 中的任务列表逐步实现功能。
+            3. **必须**编写对应的单元测试，确保代码质量。
+            4. 运行测试，如果失败，利用剩余额度自动修复代码（Self-Healing）。
+            5. 提交 PR，分支名为 `feat/issue-${{ steps.find_task.outputs.issue_number }}`。
+            6. 在 PR 描述中引用相关 Issue (#${{ steps.find_task.outputs.issue_number }})。

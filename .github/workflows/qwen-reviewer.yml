@@ -8,18 +8,44 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+          pip install numpy scipy triton pytest
+
+      - name: Run tests
+        run: |
+          # 运行现有测试以确保PR不破坏现有功能
+          if [ -d "tests" ]; then
+            python -m pytest tests/ -v
+          fi
+
       - name: Review Agent
         uses: qwenlm/qwen-code-action@v1
         with:
           qwen-token: ${{ secrets.QWEN_TOKEN }}
+          model: 'qwen-2.5-coder-32b-instruct'
           task: "review"
           prompt: |
-            你是以严苛著称的代码审查员。
+            你是以严苛著称的代码审查员，专门负责TAO-LoRA项目。
 
             请检查该 PR：
             1. **安全性**：是否存在注入风险、密钥泄露？
-            2. **一致性**：实现是否符合 `specs/` 目录下的定义？
-            3. **完备性**：是否有测试代码？
+            2. **一致性**：实现是否符合 `specs/` 目录下的定义？特别是是否遵循 `.specify/memory/constitution.md` 中的项目原则？
+            3. **完备性**：是否有充分的测试代码？
+            4. **TAO-LoRA特定要求**：
+               - 时间感知量化策略是否正确实现？
+               - 动态路径路由是否按预期工作？
+               - 硬件优化是否考虑了边缘设备约束？
+               - 关键物理事件是否得到适当保留？
+            5. **代码质量**：是否遵循项目既定的编码标准？
 
             如果发现严重问题，请 Request Changes。
             如果是 `[CHAOS]` 前缀的 PR，请格外注意是否改变了原有业务逻辑（Chaos Monkey 不应改变业务逻辑，只能重构）。
+            对于TAO-LoRA核心算法的修改，要特别仔细审查，确保不会影响事件保留的关键功能。
