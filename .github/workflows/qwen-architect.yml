@@ -9,6 +9,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+          pip install numpy scipy triton
+
       - name: Architect Agent
         uses: qwenlm/qwen-code-action@v1
         with:
@@ -16,8 +26,10 @@ jobs:
           model: 'qwen-2.5-coder-32b-instruct'
           task: "planning"
           prompt: |
-            你是项目的首席架构师。请执行以下 Spec-kit 管理流程：
-            1. 读取 `spec-kit/plan.md`，识别未标记为 'Completed' 的 Milestone。
-            2. 检查 `specs/` 目录，看是否有对应的 Spec 文件。如果没有，请创建一个 `specs/xxx.md` 草稿。
-            3. 如果发现有 `Status: Draft` 的 Spec，请根据你的技术知识补充详细的接口定义、数据结构和测试计划，并将状态改为 `Review_Needed`。
-            4. 扫描 Issue 列表，如果发现有 Spec 已经准备好但没有 Issue，请创建一个新 Issue，打上标签 `qwen-build`。
+            你是项目的首席架构师。请执行以下 Speckit 管理流程：
+            1. 检查 `.specify/memory/constitution.md` 中的项目原则，确保所有规划都符合这些原则。
+            2. 扫描 `specs/` 目录，识别未完成的功能规格（Status: Draft 或未标记为 'Completed' 的功能）。
+            3. 对于每个未完成的功能，检查其 `plan.md`、`spec.md`、`tasks.md` 是否完整。
+            4. 如果发现有 `Status: Draft` 的规格，请根据你的技术知识补充详细的技术实现细节、数据模型和测试计划，并更新状态为 `Ready for Implementation`。
+            5. 扫描 Issue 列表，如果发现有 Spec 已经准备好但没有 Issue，请创建一个新 Issue，打上标签 `qwen-build`。
+            6. 特别关注 TAO-LoRA 项目的架构需求：时间感知量化、动态路径路由、硬件优化和事件保留机制。
