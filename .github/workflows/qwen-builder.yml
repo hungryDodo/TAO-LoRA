@@ -1,0 +1,37 @@
+name: 🔨 Qwen Builder
+on:
+  schedule:
+    - cron: '*/15 * * * *' # 每15分钟检查一次
+  issues:
+    types: [labeled]
+
+jobs:
+  build:
+    if: contains(github.event.issue.labels.*.name, 'qwen-build') || github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Find Task
+        id: find_task
+        run: |
+          # 简单的脚本去查找带有 'qwen-build' 标签且未分配的 Issue
+          # 输出 Issue Number 和相关 Spec 文件路径
+
+      - name: Builder Agent
+        if: steps.find_task.outputs.issue_number != ''
+        uses: qwenlm/qwen-code-action@v1
+        with:
+          qwen-token: ${{ secrets.QWEN_TOKEN }}
+          model: 'qwen-2.5-coder-32b-instruct'
+          task: "implement"
+          prompt: |
+            你是高级开发工程师。
+            目标：解决 Issue #${{ steps.find_task.outputs.issue_number }}
+            依据：请严格遵循 Spec 文档 ${{ steps.find_task.outputs.spec_path }}
+
+            执行步骤：
+            1. 编写/修改代码。
+            2. **必须**编写对应的单元测试。
+            3. 运行测试，如果失败，利用剩余额度自动修复代码（Self-Healing）。
+            4. 提交 PR，分支名为 `feat/issue-${{ steps.find_task.outputs.issue_number }}`。
